@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FLUX — Neon Flight</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+  *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+  :root{--cyan:#00f5ff;--magenta:#ff00aa;--dark:#050810;--darker:#020508;--glow-cyan:0 0 20px #00f5ff88,0 0 60px #00f5ff44}
+  body{background:var(--darker);display:flex;align-items:center;justify-content:center;min-height:100vh;overflow:hidden;font-family:'Rajdhani',sans-serif;user-select:none}
+  #wrapper{position:relative}
+  canvas{display:block;border-radius:14px;border:1px solid #00f5ff22;box-shadow:0 0 60px #00f5ff18,0 0 160px #00f5ff08}
+  .screen{position:absolute;inset:0;border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:linear-gradient(160deg,#050810ee 0%,#0a0518ee 100%);backdrop-filter:blur(6px);transition:opacity .35s ease;z-index:10}
+  .screen.hidden{opacity:0;pointer-events:none}
+  .screen-badge{font-family:'Orbitron',monospace;font-size:11px;letter-spacing:6px;color:var(--cyan);text-transform:uppercase;margin-bottom:8px;opacity:.7}
+  .screen-title{font-family:'Orbitron',monospace;font-size:64px;font-weight:900;line-height:1;background:linear-gradient(135deg,var(--cyan),var(--magenta));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;filter:drop-shadow(0 0 24px #00f5ff66);margin-bottom:4px}
+  .screen-sub{font-family:'Rajdhani',sans-serif;font-size:13px;letter-spacing:4px;color:#ffffff44;text-transform:uppercase;margin-bottom:20px}
+  .hint{font-family:'Rajdhani',sans-serif;font-size:13px;letter-spacing:3px;color:#ffffff33;margin-top:20px;animation:pulse 2s ease-in-out infinite}
+  .divider{width:140px;height:1px;background:linear-gradient(90deg,transparent,var(--cyan),transparent);margin:12px 0;opacity:.35}
+  .btn{font-family:'Orbitron',monospace;font-size:13px;letter-spacing:4px;text-transform:uppercase;color:var(--dark);background:linear-gradient(135deg,var(--cyan),#00aaff);border:none;padding:14px 44px;border-radius:5px;cursor:pointer;transition:transform .15s,box-shadow .15s;box-shadow:var(--glow-cyan)}
+  .btn:hover{transform:scale(1.04);box-shadow:0 0 30px #00f5ffaa,0 0 80px #00f5ff55}
+  .btn:active{transform:scale(.97)}
+  .btn-ghost{font-family:'Orbitron',monospace;font-size:11px;letter-spacing:3px;text-transform:uppercase;color:#ffffff55;background:transparent;border:1px solid #ffffff1a;padding:10px 32px;border-radius:5px;cursor:pointer;margin-top:10px;transition:transform .15s,color .15s}
+  .btn-ghost:hover{color:#ffffff99;border-color:#ffffff44;transform:scale(1.03)}
+  /* difficulty */
+  .diff-row{display:flex;gap:10px;margin-bottom:4px}
+  .diff-btn{font-family:'Orbitron',monospace;font-size:10px;letter-spacing:3px;text-transform:uppercase;border:1.5px solid;background:transparent;padding:9px 18px;border-radius:5px;cursor:pointer;transition:transform .15s,background .15s,box-shadow .15s}
+  .diff-btn.easy{color:#00ff88;border-color:#00ff88}
+  .diff-btn.medium{color:#ffcc00;border-color:#ffcc00}
+  .diff-btn.hard{color:#ff3355;border-color:#ff3355}
+  .diff-btn.easy:hover,.diff-btn.easy.active{background:#00ff8822;box-shadow:0 0 20px #00ff8877;transform:scale(1.05)}
+  .diff-btn.medium:hover,.diff-btn.medium.active{background:#ffcc0022;box-shadow:0 0 20px #ffcc0077;transform:scale(1.05)}
+  .diff-btn.hard:hover,.diff-btn.hard.active{background:#ff335522;box-shadow:0 0 20px #ff335577;transform:scale(1.05)}
+  /* skins */
+  .skins-label{font-family:'Orbitron',monospace;font-size:9px;letter-spacing:4px;color:#ffffff33;text-transform:uppercase;margin-bottom:8px;margin-top:10px}
+  .skins-row{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;max-width:480px}
+  .skin-btn{width:44px;height:44px;border-radius:8px;border:1.5px solid #ffffff22;background:#ffffff08;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform .15s,border-color .15s,box-shadow .15s;position:relative;flex-shrink:0}
+  .skin-btn canvas{border-radius:6px;pointer-events:none}
+  .skin-btn.active{border-color:#ffffff88;box-shadow:0 0 14px #ffffff44;transform:scale(1.1)}
+  .skin-btn.locked{opacity:.35;cursor:default;filter:grayscale(1)}
+  .skin-btn.locked:hover{transform:none}
+  .skin-btn:not(.locked):hover{transform:scale(1.08);border-color:#ffffff55}
+  .skin-lock{position:absolute;bottom:2px;right:3px;font-size:9px;color:#ffffff66}
+  .skin-score{position:absolute;bottom:2px;right:3px;font-size:7px;font-family:'Orbitron',monospace;color:#ffffff55;letter-spacing:0}
+  /* death screen */
+  .score-block{display:flex;flex-direction:column;align-items:center;margin-bottom:20px}
+  .score-lbl{font-family:'Orbitron',monospace;font-size:10px;letter-spacing:5px;color:#ffffff33;margin-bottom:4px}
+  .score-val{font-family:'Orbitron',monospace;font-size:80px;font-weight:900;line-height:1;background:linear-gradient(135deg,#fff,var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;filter:drop-shadow(0 0 16px #00f5ff88)}
+  .best-lbl{font-family:'Rajdhani',sans-serif;font-size:12px;letter-spacing:3px;color:var(--magenta);margin-top:6px;opacity:.8}
+  /* unlock banner */
+  #unlock-banner{position:absolute;top:18px;left:50%;transform:translateX(-50%) translateY(-80px);background:linear-gradient(135deg,#1a0a2e,#0a1a2e);border:1px solid;border-radius:8px;padding:10px 22px;display:flex;align-items:center;gap:12px;z-index:20;transition:transform .5s cubic-bezier(.34,1.56,.64,1),opacity .4s;opacity:0;white-space:nowrap}
+  #unlock-banner.show{transform:translateX(-50%) translateY(0);opacity:1}
+  #unlock-banner .ub-label{font-family:'Orbitron',monospace;font-size:9px;letter-spacing:3px;color:#ffffff55;text-transform:uppercase}
+  #unlock-banner .ub-name{font-family:'Orbitron',monospace;font-size:13px;font-weight:700;letter-spacing:2px}
+  #unlock-banner canvas{border-radius:5px;flex-shrink:0}
+  @keyframes pulse{0%,100%{opacity:.25}50%{opacity:.65}}
+</style>
+</head>
+<body>
+<div id="wrapper">
+  <canvas id="c"></canvas>
+
+  <!-- Unlock banner -->
+
+  <div id="unlock-banner">
+    <canvas id="ub-preview" width="32" height="32"></canvas>
+    <div>
+      <div class="ub-label">Skin Unlocked</div>
+      <div class="ub-name" id="ub-name">—</div>
+    </div>
+  </div>
+
+  <!-- Start Screen -->
+
+  <div class="screen" id="start-screen">
+    <div class="screen-badge">Neon Flight</div>
+    <div class="screen-title">FLUX</div>
+    <div class="screen-sub">Survive the Grid</div>
+    <div class="divider"></div>
+    <div class="diff-row">
+      <button class="diff-btn easy active" data-diff="easy">Easy</button>
+      <button class="diff-btn medium" data-diff="medium">Medium</button>
+      <button class="diff-btn hard" data-diff="hard">Hard</button>
+    </div>
+    <div class="skins-label">Ship Skins</div>
+    <div class="skins-row" id="skins-row"></div>
+    <button class="btn" id="start-btn" style="margin-top:18px">LAUNCH</button>
+    <div class="hint">SPACE · CLICK · TAP</div>
+  </div>
+
+  <!-- Death Screen -->
+
+  <div class="screen hidden" id="death-screen">
+    <div class="screen-badge">Game Over</div>
+    <div class="score-block">
+      <div class="score-lbl">Score</div>
+      <div class="score-val" id="final-score">0</div>
+      <div class="best-lbl" id="best-label"></div>
+    </div>
+    <button class="btn" id="restart-btn">RETRY</button>
+    <button class="btn-ghost" id="menu-btn">MENU</button>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════
+//  SKINS DEFINITION
+// ═══════════════════════════════════════════
+const SKINS = [
+  {
+    id:'flux', name:'FLUX', unlockAt:0, desc:'Default',
+    // cyan diamond
+    draw(ctx, cx, cy, r, t) {
+      ctx.shadowColor='#00f5ff'; ctx.shadowBlur=r*2.2;
+      ctx.beginPath();
+      ctx.moveTo(cx+r,cy); ctx.lineTo(cx,cy-r*.7);
+      ctx.lineTo(cx-r*.9,cy); ctx.lineTo(cx,cy+r*.7); ctx.closePath();
+      const g=ctx.createLinearGradient(cx-r,cy,cx+r,cy);
+      g.addColorStop(0,'#00aaff'); g.addColorStop(.5,'#00f5ff'); g.addColorStop(1,'#ffffff');
+      ctx.fillStyle=g; ctx.fill();
+      ctx.strokeStyle='#ffffff'; ctx.lineWidth=1.2; ctx.shadowBlur=0; ctx.stroke();
+      // inner
+      ctx.beginPath(); ctx.moveTo(cx+r*.4,cy); ctx.lineTo(cx,cy-r*.3); ctx.lineTo(cx-r*.4,cy); ctx.lineTo(cx,cy+r*.3); ctx.closePath();
+      ctx.fillStyle='#ffffff77'; ctx.fill();
+      // engine
+      const eg=ctx.createRadialGradient(cx-r,cy,0,cx-r,cy,r*.85);
+      eg.addColorStop(0,'#ff00aacc'); eg.addColorStop(1,'transparent');
+      ctx.fillStyle=eg; ctx.beginPath(); ctx.arc(cx-r,cy,r*.85,0,Math.PI*2); ctx.fill();
+    },
+    trailHue:180, glowColor:'#00f5ff', accentColor:'#ff00aa'
+  },
+  {
+    id:'ember', name:'EMBER', unlockAt:15, desc:'Score 15',
+    // orange-red elongated dart
+    draw(ctx, cx, cy, r, t) {
+      ctx.shadowColor='#ff6600'; ctx.shadowBlur=r*2.5;
+      ctx.beginPath();
+      ctx.moveTo(cx+r*1.1,cy); ctx.lineTo(cx,cy-r*.6);
+      ctx.lineTo(cx-r*.8,cy); ctx.lineTo(cx,cy+r*.6); ctx.closePath();
+      const g=ctx.createLinearGradient(cx-r,cy,cx+r,cy);
+      g.addColorStop(0,'#ff2200'); g.addColorStop(.5,'#ff7700'); g.addColorStop(1,'#ffcc44');
+      ctx.fillStyle=g; ctx.fill();
+      ctx.strokeStyle='#ffaa33'; ctx.lineWidth=1.2; ctx.shadowBlur=0; ctx.stroke();
+      // fire inner
+      ctx.beginPath(); ctx.moveTo(cx+r*.5,cy); ctx.lineTo(cx,cy-r*.25); ctx.lineTo(cx-r*.3,cy); ctx.lineTo(cx,cy+r*.25); ctx.closePath();
+      ctx.fillStyle='#ffee8877'; ctx.fill();
+      // engine
+      const eg=ctx.createRadialGradient(cx-r*.8,cy,0,cx-r*.8,cy,r);
+      eg.addColorStop(0,'#ff4400cc'); eg.addColorStop(1,'transparent');
+      ctx.fillStyle=eg; ctx.beginPath(); ctx.arc(cx-r*.8,cy,r,0,Math.PI*2); ctx.fill();
+    },
+    trailHue:25, glowColor:'#ff6600', accentColor:'#ff2200'
+  },
+  {
+    id:'venom', name:'VENOM', unlockAt:30, desc:'Score 30',
+    // toxic green wide arrowhead
+    draw(ctx, cx, cy, r, t) {
+      ctx.shadowColor='#00ff44'; ctx.shadowBlur=r*2.2;
+      ctx.beginPath();
+      ctx.moveTo(cx+r,cy); ctx.lineTo(cx+r*.1,cy-r*.85);
+      ctx.lineTo(cx-r,cy); ctx.lineTo(cx+r*.1,cy+r*.85); ctx.closePath();
+      const g=ctx.createLinearGradient(cx-r,cy,cx+r,cy);
+      g.addColorStop(0,'#004400'); g.addColorStop(.4,'#00aa22'); g.addColorStop(1,'#88ff44');
+      ctx.fillStyle=g; ctx.fill();
+      ctx.strokeStyle='#44ff66'; ctx.lineWidth=1.2; ctx.shadowBlur=0; ctx.stroke();
+      // drip inner
+      ctx.beginPath(); ctx.arc(cx,cy,r*.3,0,Math.PI*2);
+      ctx.fillStyle='#aaffaa55'; ctx.fill();
+      // engine
+      const eg=ctx.createRadialGradient(cx-r,cy,0,cx-r,cy,r*.9);
+      eg.addColorStop(0,'#00ff44bb'); eg.addColorStop(1,'transparent');
+      ctx.fillStyle=eg; ctx.beginPath(); ctx.arc(cx-r,cy,r*.9,0,Math.PI*2); ctx.fill();
+    },
+    trailHue:120, glowColor:'#00ff44', accentColor:'#44ff00'
+  },
+  {
+    id:'ghost', name:'GHOST', unlockAt:50, desc:'Score 50',
+    // white ethereal rounded form
+    draw(ctx, cx, cy, r, t) {
+      const pulse = Math.sin(t*4)*0.15+0.85;
+      ctx.shadowColor='#aaddff'; ctx.shadowBlur=r*3*pulse;
+      ctx.beginPath();
+      ctx.moveTo(cx+r,cy); ctx.lineTo(cx+r*.2,cy-r*.8);
+      ctx.lineTo(cx-r*.7,cy-r*.3); ctx.lineTo(cx-r*.9,cy);
+      ctx.lineTo(cx-r*.7,cy+r*.3); ctx.lineTo(cx+r*.2,cy+r*.8); ctx.closePath();
+      const g=ctx.createLinearGradient(cx-r,cy,cx+r,cy);
+      g.addColorStop(0,'#aabbcc66'); g.addColorStop(.5,`rgba(220,240,255,${0.7*pulse})`); g.addColorStop(1,'#ffffff');
+      ctx.fillStyle=g; ctx.fill();
+      ctx.strokeStyle=`rgba(200,240,255,${pulse})`; ctx.lineWidth=1.2; ctx.shadowBlur=0; ctx.stroke();
+      // core shimmer
+      const eg=ctx.createRadialGradient(cx+r*.3,cy,0,cx,cy,r*.8);
+      eg.addColorStop(0,`rgba(255,255,255,${0.6*pulse})`); eg.addColorStop(1,'transparent');
+      ctx.fillStyle=eg; ctx.beginPath(); ctx.arc(cx,cy,r*.8,0,Math.PI*2); ctx.fill();
+    },
+    trailHue:200, glowColor:'#aaddff', accentColor:'#cceeff'
+  },
+  {
+    id:'nova', name:'NOVA', unlockAt:75, desc:'Score 75',
+    // gold star shape
+    draw(ctx, cx, cy, r, t) {
+      ctx.shadowColor='#ffdd00'; ctx.shadowBlur=r*2.8;
+      // 4-point star
+      ctx.beginPath();
+      const pts=[[r,0],[r*.25,-r*.25],[0,-r*.9],[-.25,-r*.25],[-r*.9,0],[-.25,r*.25],[0,r*.9],[r*.25,r*.25]];
+      ctx.moveTo(cx+pts[0][0],cy+pts[0][1]);
+      for(let i=1;i<pts.length;i++) ctx.lineTo(cx+pts[i][0],cy+pts[i][1]);
+      ctx.closePath();
+      const g=ctx.createRadialGradient(cx,cy,0,cx,cy,r);
+      g.addColorStop(0,'#ffffff'); g.addColorStop(.3,'#ffee44'); g.addColorStop(1,'#ff8800');
+      ctx.fillStyle=g; ctx.fill();
+      ctx.strokeStyle='#ffdd00'; ctx.lineWidth=1; ctx.shadowBlur=0; ctx.stroke();
+      // halo
+      const hg=ctx.createRadialGradient(cx,cy,r*.5,cx,cy,r*1.3);
+      hg.addColorStop(0,'transparent'); hg.addColorStop(1,'#ffaa0022');
+      ctx.fillStyle=hg; ctx.beginPath(); ctx.arc(cx,cy,r*1.3,0,Math.PI*2); ctx.fill();
+    },
+    trailHue:50, glowColor:'#ffdd00', accentColor:'#ff8800'
+  },
+  {
+    id:'void', name:'VOID', unlockAt:100, desc:'Score 100',
+    // dark purple tear-drop with dark matter
+    draw(ctx, cx, cy, r, t) {
+      ctx.shadowColor='#9900ff'; ctx.shadowBlur=r*2.5;
+      ctx.beginPath();
+      ctx.moveTo(cx+r*1.1,cy); ctx.quadraticCurveTo(cx+r*.3,cy-r*.9,cx-r*.7,cy);
+      ctx.quadraticCurveTo(cx+r*.3,cy+r*.9,cx+r*1.1,cy); ctx.closePath();
+      const g=ctx.createLinearGradient(cx-r,cy,cx+r,cy);
+      g.addColorStop(0,'#0a0020'); g.addColorStop(.4,'#5500aa'); g.addColorStop(1,'#cc44ff');
+      ctx.fillStyle=g; ctx.fill();
+      ctx.strokeStyle='#aa22ff'; ctx.lineWidth=1.2; ctx.shadowBlur=0; ctx.stroke();
+      // void core
+      ctx.beginPath(); ctx.arc(cx+r*.1,cy,r*.3,0,Math.PI*2);
+      ctx.fillStyle='#000000cc'; ctx.fill();
+      ctx.strokeStyle='#cc44ff88'; ctx.lineWidth=1; ctx.stroke();
+      // orbiting ring
+      const rx=cx+Math.cos(t*3)*r*.55, ry=cy+Math.sin(t*3)*r*.3;
+      ctx.beginPath(); ctx.arc(rx,ry,r*.12,0,Math.PI*2);
+      ctx.fillStyle='#dd88ffcc'; ctx.fill();
+    },
+    trailHue:280, glowColor:'#9900ff', accentColor:'#cc44ff'
+  },
+  {
+    id:'prism', name:'PRISM', unlockAt:150, desc:'Score 150',
+    // rainbow prismatic crystal
+    draw(ctx, cx, cy, r, t) {
+      const hue=(t*60)%360;
+      ctx.shadowColor=`hsl(${hue},100%,60%)`; ctx.shadowBlur=r*3;
+      ctx.beginPath();
+      ctx.moveTo(cx+r,cy); ctx.lineTo(cx+r*.3,cy-r*.9);
+      ctx.lineTo(cx-r*.2,cy-r*.5); ctx.lineTo(cx-r,cy);
+      ctx.lineTo(cx-r*.2,cy+r*.5); ctx.lineTo(cx+r*.3,cy+r*.9); ctx.closePath();
+      const g=ctx.createLinearGradient(cx-r,cy-r,cx+r,cy+r);
+      g.addColorStop(0,`hsl(${hue},100%,70%)`);
+      g.addColorStop(.33,`hsl(${(hue+120)%360},100%,70%)`);
+      g.addColorStop(.66,`hsl(${(hue+240)%360},100%,70%)`);
+      g.addColorStop(1,`hsl(${hue},100%,70%)`);
+      ctx.fillStyle=g; ctx.fill();
+      ctx.strokeStyle=`hsl(${(hue+60)%360},100%,85%)`; ctx.lineWidth=1.5; ctx.shadowBlur=0; ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(cx+r*.4,cy); ctx.lineTo(cx,cy-r*.35); ctx.lineTo(cx-r*.4,cy); ctx.lineTo(cx,cy+r*.35); ctx.closePath();
+      ctx.fillStyle='rgba(255,255,255,0.5)'; ctx.fill();
+    },
+    trailHue:-1, glowColor:'#ff88ff', accentColor:'#88ffff' // -1 = rainbow trail
+  },
+  {
+    id:'phoenix', name:'PHOENIX', unlockAt:200, desc:'Score 200',
+    // ultimate fire-wing form
+    draw(ctx, cx, cy, r, t) {
+      const flicker=Math.sin(t*12)*0.1+0.9;
+      ctx.shadowColor='#ff4400'; ctx.shadowBlur=r*3.5*flicker;
+      // wing top
+      ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(cx+r*.4,cy-r*1.1); ctx.lineTo(cx-r*.2,cy-r*.5); ctx.closePath();
+      const wg1=ctx.createLinearGradient(cx-r*.2,cy-r,cx+r*.4,cy);
+      wg1.addColorStop(0,'#ff8800cc'); wg1.addColorStop(1,'transparent');
+      ctx.fillStyle=wg1; ctx.fill();
+      // wing bottom
+      ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(cx+r*.4,cy+r*1.1); ctx.lineTo(cx-r*.2,cy+r*.5); ctx.closePath();
+      ctx.fillStyle=wg1; ctx.fill();
+      // body
+      ctx.beginPath();
+      ctx.moveTo(cx+r,cy); ctx.lineTo(cx+r*.1,cy-r*.55);
+      ctx.lineTo(cx-r*.6,cy); ctx.lineTo(cx+r*.1,cy+r*.55); ctx.closePath();
+      const g=ctx.createLinearGradient(cx-r,cy,cx+r,cy);
+      g.addColorStop(0,'#cc1100'); g.addColorStop(.4,'#ff5500'); g.addColorStop(.8,'#ffaa00'); g.addColorStop(1,'#ffee88');
+      ctx.fillStyle=g; ctx.fill();
+      ctx.strokeStyle=`rgba(255,200,0,${flicker})`; ctx.lineWidth=1.5; ctx.shadowBlur=0; ctx.stroke();
+      // eye
+      ctx.beginPath(); ctx.arc(cx+r*.4,cy,r*.15,0,Math.PI*2);
+      ctx.fillStyle='#ffffff'; ctx.fill();
+      ctx.beginPath(); ctx.arc(cx+r*.42,cy,r*.08,0,Math.PI*2);
+      ctx.fillStyle='#ff2200'; ctx.fill();
+    },
+    trailHue:30, glowColor:'#ff5500', accentColor:'#ffaa00'
+  }
+];
+
+// ═══════════════════════════════════════════
+//  CANVAS SETUP
+// ═══════════════════════════════════════════
+const canvas = document.getElementById('c');
+const ctx    = canvas.getContext('2d');
+
+function resize() {
+  const vw=window.innerWidth, vh=window.innerHeight;
+  const aspect=16/10;
+  let w=Math.min(vw*0.94,980), h=w/aspect;
+  if(h>vh*0.94){h=vh*0.94;w=h*aspect;}
+  canvas.width=Math.floor(w); canvas.height=Math.floor(h);
+  const wr=document.getElementById('wrapper');
+  wr.style.width=canvas.width+'px'; wr.style.height=canvas.height+'px';
+}
+resize();
+window.addEventListener('resize',()=>{resize();makeStars();});
+
+const W=()=>canvas.width, H=()=>canvas.height;
+
+// ═══════════════════════════════════════════
+//  SKIN UI SETUP
+// ═══════════════════════════════════════════
+let activeSkin = 'flux';
+const bestScores={easy:0,medium:0,hard:0};
+const unlockedSkins = new Set(['flux']);
+
+function buildSkinsRow() {
+  const row=document.getElementById('skins-row');
+  row.innerHTML='';
+  SKINS.forEach(skin=>{
+    const btn=document.createElement('button');
+    btn.className='skin-btn'+(skin.id===activeSkin?' active':'')+(unlockedSkins.has(skin.id)?'':' locked');
+    btn.dataset.id=skin.id;
+    // mini preview canvas
+    const pc=document.createElement('canvas');
+    pc.width=32; pc.height=32;
+    const pctx=pc.getContext('2d');
+    pctx.clearRect(0,0,32,32);
+    drawSkinPreview(pctx,skin,16,16,9,0);
+    btn.appendChild(pc);
+    // lock / score badge
+    const badge=document.createElement('div');
+    if(!unlockedSkins.has(skin.id)){
+      badge.className='skin-score';
+      badge.textContent=skin.unlockAt;
+    }
+    btn.appendChild(badge);
+    btn.title=skin.name+(unlockedSkins.has(skin.id)?'':` — unlock at score ${skin.unlockAt}`);
+    btn.addEventListener('mousedown',e=>{
+      e.stopPropagation();
+      if(!unlockedSkins.has(skin.id)) return;
+      activeSkin=skin.id;
+      document.querySelectorAll('.skin-btn').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+    });
+    row.appendChild(btn);
+  });
+}
+
+function drawSkinPreview(pctx, skin, cx, cy, r, t) {
+  pctx.clearRect(0,0,pctx.canvas.width,pctx.canvas.height);
+  // dark bg
+  pctx.fillStyle='#0a0a18';
+  pctx.fillRect(0,0,pctx.canvas.width,pctx.canvas.height);
+  pctx.save();
+  skin.draw(pctx, cx, cy, r, t);
+  pctx.restore();
+}
+
+function refreshSkinsUI() {
+  const bestAny=Math.max(...Object.values(bestScores));
+  SKINS.forEach(skin=>{
+    if(bestAny>=skin.unlockAt) unlockedSkins.add(skin.id);
+  });
+  buildSkinsRow();
+}
+
+// animate skin previews
+let skinAnimT=0;
+setInterval(()=>{
+  skinAnimT+=0.05;
+  document.querySelectorAll('.skin-btn canvas').forEach((pc,i)=>{
+    const skin=SKINS[i];
+    if(!skin) return;
+    const pctx=pc.getContext('2d');
+    drawSkinPreview(pctx,skin,16,16,9,skinAnimT);
+  });
+},50);
+
+// ═══════════════════════════════════════════
+//  UNLOCK BANNER
+// ═══════════════════════════════════════════
+let bannerTimer=null;
+function showUnlockBanner(skin) {
+  const banner=document.getElementById('unlock-banner');
+  const ubName=document.getElementById('ub-name');
+  const ubPrev=document.getElementById('ub-preview');
+  banner.style.borderColor=skin.glowColor+'88';
+  ubName.textContent=skin.name;
+  ubName.style.color=skin.glowColor;
+  const pctx=ubPrev.getContext('2d');
+  drawSkinPreview(pctx,skin,16,16,10,0);
+  banner.classList.add('show');
+  if(bannerTimer) clearTimeout(bannerTimer);
+  bannerTimer=setTimeout(()=>banner.classList.remove('show'),3200);
+}
+
+// ═══════════════════════════════════════════
+//  GAME CONFIG
+// ═══════════════════════════════════════════
+const DIFFS={
+  easy:  {gapBase:.26,gapMin:.19,label:'EASY',  color:'#00ff88'},
+  medium:{gapBase:.20,gapMin:.14,label:'MEDIUM',color:'#ffcc00'},
+  hard:  {gapBase:.155,gapMin:.105,label:'HARD', color:'#ff3355'},
+};
+let difficulty='easy';
+
+document.querySelectorAll('.diff-btn').forEach(btn=>{
+  btn.addEventListener('mousedown',e=>{
+    e.stopPropagation();
+    document.querySelectorAll('.diff-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    difficulty=btn.dataset.diff;
+  });
+});
+
+const GRAVITY=0.00058, FLAP_V=-0.0128;
+const PIPE_W_F=0.065, BASE_SPD=0.0042, MAX_SPD=BASE_SPD*5;
+const BIRD_XF=0.30, BIRD_R_F=0.022;
+
+let state='start', score, frame, pipes, particles, bgStars;
+let vy, birdY, speed, gap, scorePop=0, animId;
+let gameTime=0; // for animated skins
+
+// ═══════════════════════════════════════════
+//  STARS
+// ═══════════════════════════════════════════
+function makeStars(){
+  bgStars=Array.from({length:160},()=>({
+    x:Math.random()*W(),y:Math.random()*H(),
+    r:Math.random()*1.4+.3,a:Math.random()*.7+.1,spd:Math.random()*.3+.08
+  }));
+}
+
+// ═══════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════
+function initGame(){
+  score=0;frame=0;pipes=[];particles=[];
+  birdY=H()/2;vy=0;speed=BASE_SPD;scorePop=0;gameTime=0;
+  gap=DIFFS[difficulty].gapBase*H();
+}
+
+// ═══════════════════════════════════════════
+//  PIPES / PARTICLES
+// ═══════════════════════════════════════════
+function spawnPipe(){
+  const pw=PIPE_W_F*W(),g=gap,marg=H()*.12;
+  pipes.push({x:W()+pw,topH:marg+Math.random()*(H()-g-marg*2),passed:false,hue:Math.random()>.5?0:1});
+}
+
+function burst(x,y){
+  const sk=SKINS.find(s=>s.id===activeSkin);
+  for(let i=0;i<32;i++){
+    const ang=Math.random()*Math.PI*2,spd=(Math.random()*5+2)*(H()/580);
+    const hue=sk.trailHue<0?Math.random()*360:sk.trailHue+(Math.random()*60-30);
+    particles.push({x,y,vx:Math.cos(ang)*spd,vy:Math.sin(ang)*spd,life:1,r:(Math.random()*4+1)*(H()/580),hue});
+  }
+}
+
+function addTrail(){
+  if(frame%2!==0) return;
+  const sk=SKINS.find(s=>s.id===activeSkin);
+  const bx=BIRD_XF*W(),br=BIRD_R_F*H();
+  const hue=sk.trailHue<0?(gameTime*60)%360:sk.trailHue;
+  particles.push({
+    x:bx-br,y:birdY+(Math.random()-.5)*br*1.4,
+    vx:-(speed*W()*.5+Math.random()),vy:(Math.random()-.5)*.6,
+    life:1,r:(Math.random()*2.5+.8)*(H()/580),hue,trail:true
+  });
+}
+
+// ═══════════════════════════════════════════
+//  DRAW BACKGROUND
+// ═══════════════════════════════════════════
+function drawBG(){
+  const cw=W(),ch=H();
+  const grad=ctx.createLinearGradient(0,0,0,ch);
+  grad.addColorStop(0,'#030612');grad.addColorStop(1,'#07030f');
+  ctx.fillStyle=grad;ctx.fillRect(0,0,cw,ch);
+  ctx.strokeStyle='#00f5ff07';ctx.lineWidth=1;
+  const gH=ch*.07,gV=cw*.07;
+  for(let y=0;y<ch;y+=gH){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(cw,y);ctx.stroke();}
+  const voff=(frame*speed*cw*.35)%gV;
+  for(let x=-voff;x<cw;x+=gV){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,ch);ctx.stroke();}
+  bgStars.forEach(s=>{
+    s.x-=s.spd*(speed/BASE_SPD)*.6;
+    if(s.x<0){s.x=cw;s.y=Math.random()*ch;}
+    ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);
+    ctx.fillStyle=`rgba(255,255,255,${s.a})`;ctx.fill();
+  });
+  for(let y=0;y<ch;y+=4){ctx.fillStyle='rgba(0,0,0,0.025)';ctx.fillRect(0,y,cw,2);}
+}
+
+// ═══════════════════════════════════════════
+//  DRAW PIPE
+// ═══════════════════════════════════════════
+function drawPipe(p){
+  const pw=PIPE_W_F*W(),ch=H();
+  const colors=p.hue===0?{c1:'#00f5ff',c2:'#0088cc',glow:'#00f5ff'}:{c1:'#aa00ff',c2:'#6600aa',glow:'#aa00ff'};
+  const drawBar=(x,y,w,h)=>{
+    if(h<=0)return;
+    const g=ctx.createLinearGradient(x,0,x+w,0);
+    g.addColorStop(0,colors.c2+'88');g.addColorStop(.3,colors.c1);g.addColorStop(.7,colors.c1);g.addColorStop(1,colors.c2+'88');
+    ctx.fillStyle=g;ctx.beginPath();ctx.roundRect(x,y,w,h,4);ctx.fill();
+    ctx.strokeStyle=colors.c1;ctx.lineWidth=1.5;ctx.shadowColor=colors.glow;ctx.shadowBlur=16;ctx.stroke();ctx.shadowBlur=0;
+    ctx.fillStyle='#ffffff1a';ctx.fillRect(x+5,y+2,4,h-4);
+    const capH=Math.max(14,ch*.025),capX=x-5,capW=w+10;
+    const cg=ctx.createLinearGradient(capX,0,capX+capW,0);
+    cg.addColorStop(0,colors.c2+'88');cg.addColorStop(.5,colors.c1);cg.addColorStop(1,colors.c2+'88');
+    ctx.fillStyle=cg;const capY=(y+h===p.topH)?y+h-capH:y;
+    if(capH<=h){ctx.beginPath();ctx.roundRect(capX,capY,capW,capH,3);ctx.fill();ctx.shadowColor=colors.glow;ctx.shadowBlur=12;ctx.strokeStyle=colors.c1;ctx.lineWidth=1.5;ctx.stroke();ctx.shadowBlur=0;}
+  };
+  drawBar(p.x,0,pw,p.topH);
+  drawBar(p.x,p.topH+gap,pw,ch-p.topH-gap);
+  const gg=ctx.createLinearGradient(p.x,p.topH,p.x,p.topH+gap);
+  gg.addColorStop(0,colors.c1+'18');gg.addColorStop(.5,colors.c1+'05');gg.addColorStop(1,colors.c1+'18');
+  ctx.fillStyle=gg;ctx.fillRect(p.x,p.topH,pw,gap);
+}
+
+// ═══════════════════════════════════════════
+//  DRAW BIRD (delegates to skin)
+// ═══════════════════════════════════════════
+function drawBird(){
+  const bx=BIRD_XF*W(),br=BIRD_R_F*H();
+  const angle=Math.max(-.5,Math.min(1.0,vy/(FLAP_V*H())*.9));
+  const sk=SKINS.find(s=>s.id===activeSkin);
+  ctx.save();
+  ctx.translate(bx,birdY);
+  ctx.rotate(angle);
+  sk.draw(ctx,0,0,br,gameTime);
+  ctx.restore();
+}
+
+// ═══════════════════════════════════════════
+//  PARTICLES
+// ═══════════════════════════════════════════
+function updateParticles(){
+  for(let i=particles.length-1;i>=0;i--){
+    const p=particles[i];
+    p.x+=p.vx;p.y+=p.vy;
+    if(!p.trail)p.vy+=.12;
+    p.life-=p.trail?.07:.035;
+    if(p.life<=0){particles.splice(i,1);continue;}
+    ctx.beginPath();ctx.arc(p.x,p.y,p.r*p.life,0,Math.PI*2);
+    ctx.fillStyle=`hsla(${p.hue},100%,70%,${p.life*.8})`;
+    ctx.shadowColor=`hsl(${p.hue},100%,60%)`;ctx.shadowBlur=7;ctx.fill();ctx.shadowBlur=0;
+  }
+}
+
+// ═══════════════════════════════════════════
+//  HUD (canvas-drawn — works on GitHub Pages)
+// ═══════════════════════════════════════════
+function drawHUD(){
+  const cw=W(),ch=H();
+  const d=DIFFS[difficulty];
+  const sk=SKINS.find(s=>s.id===activeSkin);
+
+  // Score
+  const scoreSize=Math.round(ch*.075);
+  const pop=scorePop>0?1+scorePop*.28:1;
+  ctx.save();
+  ctx.translate(cw*.045+scoreSize*.5,ch*.075);
+  ctx.scale(pop,pop);
+  ctx.font=`900 ${scoreSize}px 'Orbitron',monospace`;
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.shadowColor=scorePop>.5?sk.glowColor:sk.glowColor+'aa';
+  ctx.shadowBlur=24;
+  ctx.fillStyle=scorePop>.5?sk.glowColor:'#ffffff';
+  ctx.fillText(score,0,0);
+  ctx.shadowBlur=0;ctx.restore();
+  if(scorePop>0)scorePop-=.07;
+
+  // Speed
+  const sSize=Math.round(ch*.022);
+  ctx.font=`${sSize}px 'Orbitron',monospace`;
+  ctx.textAlign='right';ctx.textBaseline='top';
+  ctx.shadowColor='#00f5ff';ctx.shadowBlur=8;
+  ctx.fillStyle='#00f5ffcc';
+  ctx.fillText(`SPEED ×${(speed/BASE_SPD).toFixed(1)}`,cw*.97,ch*.032);
+  ctx.shadowBlur=0;
+
+  // Difficulty
+  const dSize=Math.round(ch*.019);
+  ctx.font=`${dSize}px 'Orbitron',monospace`;
+  ctx.shadowColor=d.color;ctx.shadowBlur=8;
+  ctx.fillStyle=d.color;
+  ctx.fillText(d.label,cw*.97,ch*.032+sSize+6);
+  ctx.shadowBlur=0;
+
+  // Active skin name (bottom-left, subtle)
+  const skSize=Math.round(ch*.016);
+  ctx.font=`${skSize}px 'Orbitron',monospace`;
+  ctx.textAlign='left';ctx.textBaseline='bottom';
+  ctx.fillStyle=sk.glowColor+'66';
+  ctx.fillText(sk.name,cw*.03,ch*.97);
+}
+
+// ═══════════════════════════════════════════
+//  COLLISION
+// ═══════════════════════════════════════════
+function hit(p){
+  const bx=BIRD_XF*W(),br=BIRD_R_F*H(),pw=PIPE_W_F*W(),pad=br*.3;
+  if((bx+br-pad)<p.x||(bx-br+pad)>p.x+pw)return false;
+  return(birdY-br+pad)<p.topH||(birdY+br-pad)>p.topH+gap;
+}
+
+// ═══════════════════════════════════════════
+//  MAIN LOOP
+// ═══════════════════════════════════════════
+function loop(){
+  if(state!=='play')return;
+  frame++;gameTime+=0.016;
+  const cw=W(),ch=H(),pw=PIPE_W_F*cw,bx=BIRD_XF*cw,d=DIFFS[difficulty];
+  speed=Math.min(MAX_SPD,BASE_SPD+score*.000085);
+  gap=Math.max(d.gapMin*ch,d.gapBase*ch-score*ch*.0024);
+  vy+=GRAVITY*ch;birdY+=vy;
+  if(birdY+BIRD_R_F*ch>=ch||birdY-BIRD_R_F*ch<=0){die();return;}
+  const interval=Math.max(52,Math.round(88-score*.45));
+  if(frame%interval===0)spawnPipe();
+  for(let i=pipes.length-1;i>=0;i--){
+    pipes[i].x-=speed*cw;
+    if(!pipes[i].passed&&pipes[i].x+pw<bx){pipes[i].passed=true;score++;scorePop=1;}
+    if(hit(pipes[i])){die();return;}
+    if(pipes[i].x+pw<-10)pipes.splice(i,1);
+  }
+  addTrail();drawBG();pipes.forEach(drawPipe);updateParticles();drawBird();drawHUD();
+  animId=requestAnimationFrame(loop);
+}
+
+// ═══════════════════════════════════════════
+//  FLAP / START / DIE
+// ═══════════════════════════════════════════
+function flap(){
+  if(state==='start'){startGame();return;}
+  if(state==='play')vy=FLAP_V*H();
+}
+
+function startGame(){
+  cancelAnimationFrame(animId);
+  initGame();state='play';
+  document.getElementById('start-screen').classList.add('hidden');
+  document.getElementById('death-screen').classList.add('hidden');
+  loop();
+}
+
+function die(){
+  state='dead';
+  burst(BIRD_XF*W(),birdY);
+  cancelAnimationFrame(animId);
+  const wr=document.getElementById('wrapper');
+  wr.style.animation='none';void wr.offsetHeight;wr.style.animation='shake .35s ease';
+
+  // Update best and check for new unlocks
+  const prev=bestScores[difficulty];
+  if(score>bestScores[difficulty])bestScores[difficulty]=score;
+  const bestAny=Math.max(...Object.values(bestScores));
+
+  // Find newly unlocked skins
+  SKINS.forEach(skin=>{
+    if(skin.unlockAt>0&&!unlockedSkins.has(skin.id)&&bestAny>=skin.unlockAt){
+      unlockedSkins.add(skin.id);
+      setTimeout(()=>showUnlockBanner(skin),600);
+    }
+  });
+
+  document.getElementById('final-score').textContent=score;
+  document.getElementById('best-label').textContent=bestScores[difficulty]>0?`BEST  ${bestScores[difficulty]}`:'';
+  setTimeout(()=>{
+    drawBG();pipes.forEach(drawPipe);updateParticles();
+    document.getElementById('death-screen').classList.remove('hidden');
+    refreshSkinsUI();
+  },180);
+}
+
+function showMenu(){
+  cancelAnimationFrame(animId);state='start';
+  document.getElementById('death-screen').classList.add('hidden');
+  document.getElementById('start-screen').classList.remove('hidden');
+  refreshSkinsUI();
+  initGame();idleLoop();
+}
+
+// ═══════════════════════════════════════════
+//  IDLE LOOP
+// ═══════════════════════════════════════════
+function idleLoop(){
+  if(state!=='start')return;
+  drawBG();
+  const t=Date.now()/1000;
+  birdY=H()/2+Math.sin(t*2)*H()*.02;
+  vy=Math.cos(t*2)*H()*.005;
+  gameTime=t;
+  addTrail();updateParticles();drawBird();
+  requestAnimationFrame(idleLoop);
+}
+
+// ═══════════════════════════════════════════
+//  INPUT — mousedown/touchstart for instant jump
+// ═══════════════════════════════════════════
+document.addEventListener('keydown',e=>{if(e.code==='Space'){e.preventDefault();flap();}});
+canvas.addEventListener('mousedown',e=>{e.preventDefault();flap();});
+canvas.addEventListener('touchstart',e=>{e.preventDefault();flap();},{passive:false});
+
+document.getElementById('start-btn').addEventListener('mousedown',e=>{e.stopPropagation();startGame();});
+document.getElementById('restart-btn').addEventListener('mousedown',e=>{e.stopPropagation();startGame();});
+document.getElementById('menu-btn').addEventListener('mousedown',e=>{e.stopPropagation();showMenu();});
+
+// Shake keyframe
+const sEl=document.createElement('style');
+sEl.textContent=`@keyframes shake{0%{transform:translate(0,0)rotate(0)}20%{transform:translate(-7px,3px)rotate(-.4deg)}40%{transform:translate(6px,-3px)rotate(.35deg)}60%{transform:translate(-4px,2px)rotate(-.25deg)}80%{transform:translate(3px,-1px)rotate(.15deg)}100%{transform:translate(0,0)rotate(0)}}`;
+document.head.appendChild(sEl);
+
+// ═══════════════════════════════════════════
+//  BOOT
+// ═══════════════════════════════════════════
+makeStars();
+initGame();
+refreshSkinsUI();
+idleLoop();
+</script>
+
+</body>
+</html>
